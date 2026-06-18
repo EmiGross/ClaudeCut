@@ -1,4 +1,4 @@
-# venvs (maschinenspezifisch, schwer)
+# venvs (machine-specific, heavy)
 venv/
 .venv/
 
@@ -6,13 +6,13 @@ venv/
 __pycache__/
 *.pyc
 
-# Pro-Projekt erzeugt — gehört NICHT ins Repo (jeder Schnitt ist anders):
+# Generated per project — does NOT belong in the repo (every cut is different):
 cut.py
 transcripts.md
-schnitt.xml
-schnittplan.md
+cut.xml
+cut_plan.md
 
-# Test-/Footage-Artefakte
+# Test / footage artifacts
 test_footage/
 *.json
 *.srt

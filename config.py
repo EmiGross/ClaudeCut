@@ -1,14 +1,14 @@
 """
-config.py — maschinenspezifische Pfade für ClaudeCut.
+config.py — machine-specific paths for ClaudeCut.
 
-Andere Nutzer: hier die Pfade an die eigene Installation anpassen ODER per
-Umgebungsvariable überschreiben (kein Code-Edit nötig):
+Other users: adjust the paths to your own install here OR override them via
+environment variables (no code edit needed):
 
-    CLAUDECUT_WHISPER_PY    Python eines venv MIT faster-whisper (siehe docs/SETUP.md)
-    CLAUDECUT_TRANSCRIBE    Pfad zum Whisper-Skript (Default: das vendored transcribe.py)
+    CLAUDECUT_WHISPER_PY    Python of a venv WITH faster-whisper (see docs/SETUP.md)
+    CLAUDECUT_TRANSCRIBE    path to the Whisper script (default: the vendored transcribe.py)
 
-ffprobe/ffmpeg werden über den PATH gefunden — ffmpeg muss installiert & auf dem
-PATH sein (liefert ffprobe gleich mit).
+ffprobe/ffmpeg are found via the PATH — ffmpeg must be installed & on the PATH
+(it ships ffprobe with it).
 """
 
 import os
@@ -16,15 +16,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 
-# Python-Interpreter eines venv, in dem faster-whisper installiert ist.
-# Bewusst getrennt vom ClaudeCut-venv (das nur otio braucht) — Whisper zieht
-# CUDA-Pakete nach und ist schwergewichtig. Siehe docs/SETUP.md.
+# Python interpreter of a venv that has faster-whisper installed.
+# Deliberately separate from the ClaudeCut venv (which only needs otio) — Whisper
+# pulls in CUDA packages and is heavy. See docs/SETUP.md.
 WHISPER_PYTHON = Path(os.environ.get(
     "CLAUDECUT_WHISPER_PY",
-    r"F:\Anwendungen\Whisper\venv\Scripts\python.exe",  # ← anpassen
+    r"F:\Anwendungen\Whisper\venv\Scripts\python.exe",  # ← adjust
 ))
 
-# Das Whisper-Transkriptionsskript (liegt vendored im Repo).
+# The Whisper transcription script (vendored in the repo).
 TRANSCRIBE_SCRIPT = Path(os.environ.get(
     "CLAUDECUT_TRANSCRIBE",
     str(ROOT / "transcribe.py"),

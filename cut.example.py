@@ -1,38 +1,38 @@
 """
-cut.example.py — Referenz: ein erfundener Beispiel-Schnitt (Städtetrip-Vlog).
+cut.example.py — reference: a made-up example cut (city-trip vlog).
 
-So sieht ein gefülltes cut.py aus. Die Clips hier sind ausgedacht — zum echten
-Ausprobieren in `cut.py` umbenennen und CLIPS_DIR auf einen eigenen Footage-
-Ordner zeigen lassen (dann von prep.py die echten Dateinamen einsetzen lassen).
+This is what a filled cut.py looks like. The clips here are fictional — to try it
+for real, rename to `cut.py`, point CLIPS_DIR at your own footage folder (then let
+prep.py drop in the real filenames).
 """
 
 from pathlib import Path
 
-CLIPS_DIR = Path(r"D:\Video\Beispiel\Footage")  # anpassen
+CLIPS_DIR = Path(r"D:\Video\Example\Footage")  # adjust
 
-BRIEFING = "Knackiger Städtetrip-Recap (~60 s). Stärkste Aussagen, Unwichtiges raus."
+BRIEFING = "Punchy city-trip recap (~60 s). Strongest lines, drop the filler."
 
-# Per Rückfrage festgelegt (gemischtes 30/60-Footage): 30 fps, 1080p 16:9.
+# Decided via a follow-up question (mixed 30/60 footage): 30 fps, 1080p 16:9.
 SEQ_FPS = 30
 SEQ_W, SEQ_H = 1920, 1080
 
-# (Dateiname, In-Sekunde, Out-Sekunde, Begründung)
+# (filename, in-second, out-second, reason)
 EDL = [
     ("intro.mp4", 2.30, 16.35,
-     "Intro/Hook: Ankunft in der Stadt, kurzer Plan für den Tag (Altstadt, "
-     "Markt, Aussichtspunkt). Begrüßungs-Gerede davor ('so, da wären wir') gekappt."),
-    ("markt.mov", 17.00, 29.32,
-     "Markt-Szene, die STARKE Take: 'der frische Fisch hier ist der Wahnsinn'. "
-     "Die schwache Dublette bei ~3 s und die abgebrochenen Halbsätze danach "
-     "('komm, weiter / OK') wurden verworfen."),
-    ("aussicht.mov", 0.35, 6.90,
-     "Abschluss: 'von hier oben sieht man die ganze Bucht — perfekter Abschluss'. "
-     "Sauberer Outro-Satz."),
+     "Intro/hook: arriving in the city, quick plan for the day (old town, "
+     "market, viewpoint). Greeting chatter before it ('so, here we are') trimmed."),
+    ("market.mov", 17.00, 29.32,
+     "Market scene, the STRONG take: 'the fresh fish here is unreal'. The weak "
+     "duplicate at ~3 s and the cut-off half-sentences after it ('come on, let's "
+     "go / OK') were discarded."),
+    ("viewpoint.mov", 0.35, 6.90,
+     "Closer: 'from up here you can see the whole bay — perfect ending'. "
+     "Clean outro line."),
 ]
 
-# Bewusst NICHT verwendet (für den Schnittplan dokumentiert):
+# Deliberately NOT used (documented for the cut plan):
 DROPPED = [
     ("cafe.mov",
-     "Café-Geplänkel ('was nimmst du? – keine Ahnung, vielleicht 'nen Cappuccino'). "
-     "Trägt die Story nicht -> komplett raus."),
+     "Cafe chatter ('what are you getting? – no idea, maybe a cappuccino'). "
+     "Doesn't carry the story -> dropped entirely."),
 ]

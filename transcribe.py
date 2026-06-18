@@ -1,22 +1,21 @@
 """
-transcribe.py - Zweisprachige (DE/EN) Transkription fuer Premiere / ClaudeCut.
+transcribe.py - bilingual (DE/EN) transcription for Premiere / ClaudeCut.
 
-Geht die Audiospur in Fenstern durch, erkennt pro Fenster die Sprache
-(Deutsch/Englisch) selbst und transkribiert jeweils im Original. Gibt
-Wort-Timestamps als SRT (fuer Premiere-Import) + JSON aus, plus eine
-Uebersicht, welches Fenster welche Sprache hat.
+Walks the audio track in windows, detects the language per window (German/English)
+on its own and transcribes each in the original. Outputs word timestamps as SRT
+(for Premiere import) + JSON, plus an overview of which window is which language.
 
-ClaudeCut ruft das pro Clip einzeln auf -> die JSON-Timestamps sind dann
-clip-relativ (genau das, was die EDL pro Quelldatei braucht).
+ClaudeCut calls this per clip -> the JSON timestamps are then clip-relative
+(exactly what the EDL needs per source file).
 
-Aufruf:
+Usage:
     python transcribe.py "D:\\Video\\...\\clip.mov"
     python transcribe.py "D:\\...\\clip.mov" --langs de en --model large-v3
 
-Output liegt neben der Datei: <name>.srt, <name>.json, <name>.segments.txt
+Output goes next to the file: <name>.srt, <name>.json, <name>.segments.txt
 
-Modell-Cache: per Umgebungsvariable CLAUDECUT_WHISPER_MODELS setzbar
-(sonst der unten stehende Default-Pfad).
+Model cache: set via the CLAUDECUT_WHISPER_MODELS environment variable
+(otherwise the default path below).
 """
 
 import argparse
@@ -24,8 +23,8 @@ import json
 import os
 import sys
 
-# --- CUDA-Bibliotheken (cuBLAS/cuDNN) aus den pip-Paketen auf den PATH legen,
-#     damit CTranslate2 die GPU findet. -----------------------------------------
+# --- Put the CUDA libraries (cuBLAS/cuDNN) from the pip packages on the PATH so
+#     that CTranslate2 finds the GPU. ------------------------------------------
 def _add_cuda_to_path():
     import importlib.util
     for pkg in ("nvidia.cublas", "nvidia.cudnn"):
@@ -40,11 +39,11 @@ _add_cuda_to_path()
 
 from faster_whisper import WhisperModel, decode_audio  # noqa: E402
 
-# Modell-Cache: per env überschreibbar (andere Nutzer: anpassen). Leer/None ->
-# faster-whisper nutzt den Standard-HF-Cache (~/.cache/huggingface).
+# Model cache: overridable via env (other users: adjust). Empty/None ->
+# faster-whisper uses the default HF cache (~/.cache/huggingface).
 MODEL_DIR = os.environ.get("CLAUDECUT_WHISPER_MODELS", r"F:\Anwendungen\Whisper\models")
 SR = 16000
-WINDOW_SEC = 30.0  # Granularitaet der Sprach-Erkennung
+WINDOW_SEC = 30.0  # granularity of the language detection
 
 
 def fmt_ts(t: float) -> str:
@@ -60,9 +59,9 @@ def fmt_ts(t: float) -> str:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("audio", help="Pfad zur Audiodatei (WAV/MP3/...)")
+    ap.add_argument("audio", help="Path to the audio file (WAV/MP3/...)")
     ap.add_argument("--langs", nargs="+", default=["de", "en"],
-                    help="Erlaubte Sprachen (Default: de en)")
+                    help="Allowed languages (default: de en)")
     ap.add_argument("--model", default="large-v3")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--compute_type", default="float16")
@@ -70,25 +69,25 @@ def main():
 
     audio_path = args.audio
     if not os.path.isfile(audio_path):
-        sys.exit(f"Datei nicht gefunden: {audio_path}")
+        sys.exit(f"File not found: {audio_path}")
 
     base = os.path.splitext(audio_path)[0]
     allowed = set(args.langs)
 
-    print(f"Lade Modell {args.model} auf {args.device} ...", flush=True)
+    print(f"Loading model {args.model} on {args.device} ...", flush=True)
     try:
         model = WhisperModel(args.model, device=args.device,
                              compute_type=args.compute_type,
                              download_root=MODEL_DIR)
     except Exception as e:
-        print(f"GPU-Init fehlgeschlagen ({e}). Fallback auf CPU.", flush=True)
+        print(f"GPU init failed ({e}). Falling back to CPU.", flush=True)
         model = WhisperModel(args.model, device="cpu",
                              compute_type="int8", download_root=MODEL_DIR)
 
-    print("Dekodiere Audio ...", flush=True)
+    print("Decoding audio ...", flush=True)
     audio = decode_audio(audio_path, sampling_rate=SR)
     total_sec = len(audio) / SR
-    print(f"Laenge: {total_sec/60:.1f} min", flush=True)
+    print(f"Length: {total_sec/60:.1f} min", flush=True)
 
     all_segments = []
     win_overview = []
@@ -100,7 +99,7 @@ def main():
         chunk = audio[start_s:start_s + win_samples]
         offset = start_s / SR
 
-        # Sprache fuer dieses Fenster erkennen, auf erlaubte Sprachen begrenzen.
+        # Detect the language for this window, restrict to allowed languages.
         lang, prob, all_probs = model.detect_language(chunk)
         if lang not in allowed:
             lang = max(allowed, key=lambda L: dict(all_probs).get(L, 0.0))
@@ -127,28 +126,28 @@ def main():
                 "words": words,
             })
 
-    # --- SRT schreiben ---
+    # --- Write SRT ---
     srt_path = base + ".srt"
     with open(srt_path, "w", encoding="utf-8") as f:
         for i, s in enumerate(all_segments, 1):
             f.write(f"{i}\n{fmt_ts(s['start'])} --> {fmt_ts(s['end'])}\n"
                     f"{s['text']}\n\n")
 
-    # --- JSON (Wort-Timestamps) ---
+    # --- JSON (word timestamps) ---
     json_path = base + ".json"
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(all_segments, f, ensure_ascii=False, indent=2)
 
-    # --- Sprach-Uebersicht pro Fenster ---
+    # --- Language overview per window ---
     seg_path = base + ".segments.txt"
     with open(seg_path, "w", encoding="utf-8") as f:
         for offset, lang, prob in win_overview:
             f.write(f"{fmt_ts(offset)}\t{lang}\t{prob:.2f}\n")
 
-    print("\nFertig:")
+    print("\nDone:")
     print(f"  SRT : {srt_path}")
     print(f"  JSON: {json_path}")
-    print(f"  Sprachen pro Fenster: {seg_path}")
+    print(f"  languages per window: {seg_path}")
 
 
 if __name__ == "__main__":

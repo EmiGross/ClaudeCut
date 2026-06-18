@@ -1,4 +1,4 @@
-# ClaudeCut — venv für den XML-Teil (otio). NICHT faster-whisper hier rein:
-# Whisper läuft in einem eigenen, GPU-fähigen venv (siehe docs/SETUP.md).
+# ClaudeCut — venv for the XML part (otio). Do NOT put faster-whisper in here:
+# Whisper runs in its own, GPU-capable venv (see docs/SETUP.md).
 opentimelineio==0.18.1
 otio-fcp-adapter

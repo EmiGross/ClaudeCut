@@ -1,52 +1,52 @@
-# ClaudeCut — Anleitung für Claude Code
+# ClaudeCut — guide for Claude Code
 
-Du bist das „Gehirn" dieser Pipeline. Wenn der Nutzer dir einen **Footage-Ordner +
-ein Briefing** gibt („mach mir X draus"), fährst du den folgenden Ablauf. Die
-Skripte machen das Mechanische; die **inhaltliche Auswahl machst du**.
+You are the "brain" of this pipeline. When the user hands you a **footage folder +
+a briefing** ("make X out of this"), you run the flow below. The scripts do the
+mechanical part; **you make the editorial selection**.
 
-## Ablauf
+## Flow
 
-1. **`prep.py` laufen lassen**
+1. **Run `prep.py`**
    ```
-   python prep.py "<Footage-Ordner>" --briefing "<der eine Satz des Nutzers>"
+   python prep.py "<footage folder>" --briefing "<the user's one sentence>"
    ```
-   Das transkribiert jeden Clip (Whisper, JSON wird gecacht), misst die
-   Metadaten und schreibt `transcripts.md` + ein Scaffold `cut.py`.
+   This transcribes every clip (Whisper, JSON is cached), measures the metadata
+   and writes `transcripts.md` + a scaffold `cut.py`.
 
-2. **`transcripts.md` lesen** — die Transkripte stehen mit **clip-relativen
-   Timecodes in Sekunden** drin. Triff die inhaltliche Entscheidung:
-   - welche Soundbites rein, welche raus (Versprecher, Wiederholungen, schwache Takes, Füllmaterial),
-   - in welche **Reihenfolge** (thematisch: Hook → Blöcke → Outro, nicht zwingend chronologisch),
-   - Begründung pro Auswahl.
+2. **Read `transcripts.md`** — the transcripts are in there with **clip-relative
+   timecodes in seconds**. Make the editorial decision:
+   - which soundbites stay, which go (misspeaks, repetitions, weak takes, filler),
+   - in what **order** (thematic: hook → blocks → outro, not necessarily chronological),
+   - a reason per choice.
 
-3. **EDL in `cut.py` füllen** — Format `(Dateiname, In-Sekunde, Out-Sekunde, Grund)`.
-   Schneide auf **Wortgrenzen** (die `words[]` im JSON geben die genauen Zeiten).
-   Auch `DROPPED` füllen (verworfene Clips + Grund) — landet im Schnittplan.
+3. **Fill the EDL in `cut.py`** — format `(filename, in-second, out-second, reason)`.
+   Cut on **word boundaries** (the `words[]` in the JSON give the exact times).
+   Also fill `DROPPED` (discarded clips + reason) — it lands in the cut plan.
 
-4. **Sequenzformat prüfen.** `prep.py` schlägt eins vor. Bei **Mehrdeutigkeit
-   NICHT still entscheiden, sondern den Nutzer fragen:**
-   - gemischte Framerate (z. B. 30 + 60) → welche Ziel-fps?
-   - Hochkant + Quer gemischt → 16:9 oder 9:16?
-   - 4K-Footage → in 4K oder 1080p liefern?
-   Das ist seine Liefer-Entscheidung. Den vorgeschlagenen Wert in `cut.py` (`SEQ_FPS`, `SEQ_W`, `SEQ_H`) ggf. korrigieren.
+4. **Check the sequence format.** `prep.py` suggests one. On **ambiguity, do NOT
+   decide silently — ask the user:**
+   - mixed frame rate (e.g. 30 + 60) → which target fps?
+   - portrait + landscape mixed → 16:9 or 9:16?
+   - 4K footage → deliver in 4K or 1080p?
+   This is their delivery decision. Adjust the suggested value in `cut.py` (`SEQ_FPS`, `SEQ_W`, `SEQ_H`) if needed.
 
-5. **Dem Nutzer den Schnittplan zeigen, BEVOR gebaut wird** (sein Kontroll-Stopp).
-   Erst nach seinem OK:
+5. **Show the user the cut plan BEFORE building** (their control stop). Only after
+   their OK:
    ```
    python build_xml.py
    ```
-   → `schnitt.xml` + `schnittplan.md`.
+   → `cut.xml` + `cut_plan.md`.
 
-6. **Premiere-Import** ansagen: `Datei → Importieren → schnitt.xml`.
+6. **Announce the Premiere import**: `File → Import → cut.xml`.
 
-## Regeln
+## Rules
 
-- **Untertitel** kommen ganz am Ende, neu aus der *geschnittenen* Audio — nicht aus dem Roh-Transkript.
-- Whisper pro Clip aufrufen (macht `prep.py` so) → Timecodes bleiben clip-relativ = EDL-tauglich.
-- `cut.py` ist pro Projekt; nicht ins Repo committen (steht in `.gitignore`).
-- Bei sehr vielen/langen Clips dauert die Transkription — vorhandene `.json` werden übersprungen.
+- **Subtitles** come at the very end, freshly from the *cut* audio — not from the raw transcript.
+- Call Whisper per clip (that's what `prep.py` does) → timecodes stay clip-relative = EDL-ready.
+- `cut.py` is per project; do not commit it to the repo (it's in `.gitignore`).
+- With many/long clips, transcription takes a while — existing `.json` files are skipped.
 
-## Wenn Pfade fehlen
+## When paths are missing
 
-`config.py` hält die Whisper-Pfade (oder `CLAUDECUT_WHISPER_PY` env). Schlägt
-`prep.py` mit „Whisper-Python nicht gefunden" fehl → Nutzer auf `docs/SETUP.md` verweisen.
+`config.py` holds the Whisper paths (or `CLAUDECUT_WHISPER_PY` env). If `prep.py`
+fails with "Whisper Python not found" → point the user to `docs/SETUP.md`.

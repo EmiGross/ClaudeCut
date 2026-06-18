@@ -1,16 +1,16 @@
 # Setup
 
-ClaudeCut braucht **drei** Dinge: ffmpeg, ein Whisper-venv (GPU empfohlen) und
-ein otio-venv. Klingt nach viel — ist einmalig.
+ClaudeCut needs **three** things: ffmpeg, a Whisper venv (GPU recommended) and an
+otio venv. Sounds like a lot — it's a one-time thing.
 
-## 0. Voraussetzungen
+## 0. Prerequisites
 
 - **Python 3.12**
-- **ffmpeg** installiert und auf dem `PATH` (liefert `ffprobe` mit). Test: `ffprobe -version`.
-- **NVIDIA-GPU** für schnelles Whisper (optional — CPU-Fallback ist drin, aber langsam).
-- **Claude Code** — das macht die inhaltliche Auswahl (siehe README, „das Gehirn").
+- **ffmpeg** installed and on the `PATH` (ships `ffprobe` with it). Test: `ffprobe -version`.
+- **NVIDIA GPU** for fast Whisper (optional — there's a CPU fallback, but it's slow).
+- **Claude Code** — it makes the editorial selection (see README, "the brain").
 
-## 1. otio-venv (für `build_xml.py` / `prep.py`)
+## 1. otio venv (for `build_xml.py` / `prep.py`)
 
 ```bash
 python -m venv venv
@@ -18,51 +18,51 @@ venv\Scripts\activate          # Windows
 pip install -r requirements.txt   # opentimelineio + otio-fcp-adapter
 ```
 
-`prep.py` und `build_xml.py` laufen in diesem venv.
+`prep.py` and `build_xml.py` run in this venv.
 
-## 2. Whisper-venv (für die Transkription)
+## 2. Whisper venv (for transcription)
 
-Bewusst **getrennt** — faster-whisper zieht CUDA-Pakete nach.
+Deliberately **separate** — faster-whisper pulls in CUDA packages.
 
 ```bash
 python -m venv whisper-venv
 whisper-venv\Scripts\activate
 pip install faster-whisper
-# für GPU zusätzlich (CUDA 12):
+# for GPU additionally (CUDA 12):
 pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
 ```
 
-Das Modell `large-v3` (~3 GB) lädt beim ersten Lauf automatisch in den Cache.
+The `large-v3` model (~3 GB) downloads automatically into the cache on first run.
 
-## 3. Pfade verdrahten (`config.py`)
+## 3. Wire up the paths (`config.py`)
 
-`prep.py` ruft Whisper über das Whisper-venv-Python auf. Entweder `config.py`
-editieren **oder** Umgebungsvariablen setzen (kein Code-Edit):
+`prep.py` calls Whisper through the Whisper venv's Python. Either edit `config.py`
+**or** set environment variables (no code edit):
 
-| Variable | Bedeutung | Default |
+| Variable | Meaning | Default |
 |---|---|---|
-| `CLAUDECUT_WHISPER_PY` | Python des Whisper-venv | `F:\Anwendungen\Whisper\venv\Scripts\python.exe` |
-| `CLAUDECUT_TRANSCRIBE` | Whisper-Skript | das vendored `transcribe.py` |
-| `CLAUDECUT_WHISPER_MODELS` | Modell-Cache | `F:\Anwendungen\Whisper\models` |
+| `CLAUDECUT_WHISPER_PY` | Python of the Whisper venv | `F:\Anwendungen\Whisper\venv\Scripts\python.exe` |
+| `CLAUDECUT_TRANSCRIBE` | Whisper script | the vendored `transcribe.py` |
+| `CLAUDECUT_WHISPER_MODELS` | model cache | `F:\Anwendungen\Whisper\models` |
 
-Beispiel (PowerShell):
+Example (PowerShell):
 ```powershell
-$env:CLAUDECUT_WHISPER_PY = "C:\pfad\whisper-venv\Scripts\python.exe"
-$env:CLAUDECUT_WHISPER_MODELS = "C:\pfad\models"
+$env:CLAUDECUT_WHISPER_PY = "C:\path\whisper-venv\Scripts\python.exe"
+$env:CLAUDECUT_WHISPER_MODELS = "C:\path\models"
 ```
 
 ## 4. Test
 
 ```bash
-python prep.py "pfad\zu\einem\test-ordner" --briefing "kurzer Test"
+python prep.py "path\to\a\test-folder" --briefing "short test"
 ```
 
-Erwartung: pro Clip ein `.json` (neben dem Clip), dazu `transcripts.md` + `cut.py`
-im Projektordner, plus ein Sequenzformat-Vorschlag in der Konsole.
+Expectation: one `.json` per clip (next to the clip), plus `transcripts.md` +
+`cut.py` in the project folder, plus a sequence-format suggestion in the console.
 
 ## Troubleshooting
 
-- **„Whisper-Python nicht gefunden"** → `CLAUDECUT_WHISPER_PY` zeigt ins Leere.
-- **`ffprobe` not found** → ffmpeg nicht auf dem PATH.
-- **GPU-Init fehlgeschlagen** → fällt automatisch auf CPU (int8) zurück; langsamer, aber läuft.
-- **Premiere importiert nicht / falsche Auflösung** → `SEQ_*` in `cut.py` ans Footage anpassen; bei Mischfootage die Warnung von `prep.py` ernst nehmen.
+- **"Whisper Python not found"** → `CLAUDECUT_WHISPER_PY` points nowhere.
+- **`ffprobe` not found** → ffmpeg not on the PATH.
+- **GPU init failed** → falls back to CPU (int8) automatically; slower, but it runs.
+- **Premiere won't import / wrong resolution** → adjust `SEQ_*` in `cut.py` to the footage; on mixed footage take the warning from `prep.py` seriously.

@@ -1,26 +1,26 @@
 """
-ClaudeCut — prep.py: das Vorderteil der Pipeline.
+ClaudeCut — prep.py: the front end of the pipeline.
 
-Nimmt einen Ordner voller Clips und bereitet alles vor, damit Claude (im Chat)
-die inhaltliche Auswahl treffen kann:
+Takes a folder full of clips and prepares everything so Claude (in chat) can make
+the editorial selection:
 
-  Ordner Clips
-    ├─ pro Clip: faster-whisper (F:\\Anwendungen\\Whisper) → <clip>.json (Wort-Timestamps)
-    ├─ pro Clip: ffprobe → fps / Auflösung / Seitenverhältnis / Dauer / Audiokanäle
-    └─ schreibt:
-         transcripts.md   — alle Transkripte mit Timecodes (Claude liest das)
-         cut.py           — Scaffold: Briefing + vorgeschlagenes Sequenzformat +
-                            leere EDL + Clip-Katalog (Claude füllt die EDL)
+  Folder of clips
+    ├─ per clip: faster-whisper → <clip>.json (word timestamps)
+    ├─ per clip: ffprobe → fps / resolution / aspect / duration / audio channels
+    └─ writes:
+         transcripts.md   — all transcripts with timecodes (Claude reads this)
+         cut.py           — scaffold: briefing + suggested sequence format +
+                            empty EDL + clip catalog (Claude fills the EDL)
 
-Danach:  EDL in cut.py füllen  →  `python build_xml.py`  →  schnitt.xml für Premiere.
+After that:  fill the EDL in cut.py  →  `python build_xml.py`  →  cut.xml for Premiere.
 
-Aufruf:
-    python prep.py "D:\\Video\\Beispiel\\Footage"
-    python prep.py "D:\\...\\Footage" --briefing "90-Sek-Recap, locker, beste Aussagen" --langs de en
+Usage:
+    python prep.py "D:\\Video\\Example\\Footage"
+    python prep.py "D:\\...\\Footage" --briefing "90-sec recap, casual, best lines" --langs de en
 
-Hinweis: prep.py läuft im ClaudeCut-venv und ruft Whisper über dessen eigenes
-venv-Python auf (subprocess) — die Umgebungen bleiben getrennt. Schon vorhandene
-<clip>.json werden übersprungen (Cache), erneutes Laufen ist also billig.
+Note: prep.py runs in the ClaudeCut venv and calls Whisper through its own venv
+Python (subprocess) — the environments stay separate. Already existing <clip>.json
+files are skipped (cache), so re-running is cheap.
 """
 
 import argparse
@@ -31,7 +31,7 @@ import sys
 from collections import Counter
 from fractions import Fraction
 
-# Windows-Konsole auf UTF-8 (sonst crasht print() an →/×/⚠️ unter cp1252).
+# Force the Windows console to UTF-8 (otherwise print() crashes on →/×/⚠️ under cp1252).
 for _stream in (sys.stdout, sys.stderr):
     try:
         _stream.reconfigure(encoding="utf-8")
@@ -40,7 +40,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 ROOT = pathlib.Path(__file__).parent
 
-# Whisper-Setup: Pfade kommen aus config.py (per env überschreibbar, siehe docs/SETUP.md)
+# Whisper setup: paths come from config.py (overridable via env, see docs/SETUP.md)
 from config import TRANSCRIBE_SCRIPT as WHISPER_SCRIPT  # noqa: E402
 from config import WHISPER_PYTHON as WHISPER_PY  # noqa: E402
 
@@ -50,7 +50,7 @@ OUT_TRANSCRIPTS = ROOT / "transcripts.md"
 OUT_CUT = ROOT / "cut.py"
 
 
-# --- ffprobe-Helfer (wie in build_xml.py, hier tolerant ggü. fehlendem Audio) -
+# --- ffprobe helper (like in build_xml.py, here tolerant of missing audio) ----
 def _ffprobe(path, stream, entries):
     out = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", stream,
@@ -61,7 +61,7 @@ def _ffprobe(path, stream, entries):
 
 
 def media_info(path: pathlib.Path) -> dict:
-    """fps / Auflösung / Dauer / Audiokanäle eines Clips — fürs Sequenz-Format."""
+    """fps / resolution / duration / audio channels of a clip — for the sequence format."""
     num, den = _ffprobe(path, "v:0", "stream=r_frame_rate")[0].split("/")
     rate = float(Fraction(int(num), int(den)))
     w = int(_ffprobe(path, "v:0", "stream=width")[0])
@@ -73,8 +73,8 @@ def media_info(path: pathlib.Path) -> dict:
 
 
 def fps_label(rate: float) -> str:
-    """Krumme Raten lesbar machen (29.97, 23.976 ...). Nächste Standardrate,
-    enge Toleranz — sonst wird 30 fälschlich als 29.97 gelabelt (Δ=0.03)."""
+    """Make odd rates readable (29.97, 23.976 ...). Nearest standard rate, tight
+    tolerance — otherwise 30 gets wrongly labeled as 29.97 (Δ=0.03)."""
     std = min((23.976, 24, 25, 29.97, 30, 50, 59.94, 60), key=lambda s: abs(s - rate))
     return f"{std:g}" if abs(std - rate) < 0.02 else f"{rate:.3f}"
 
@@ -87,12 +87,12 @@ def aspect_label(w: int, h: int) -> str:
     return common.get((aw, ah), f"{aw}:{ah}")
 
 
-# --- Transkription -----------------------------------------------------------
+# --- Transcription -----------------------------------------------------------
 def transcribe(clip: pathlib.Path, langs) -> pathlib.Path:
-    """Ruft transcribe.py im Whisper-venv auf. Überspringt fertige .json (Cache)."""
+    """Calls transcribe.py in the Whisper venv. Skips finished .json (cache)."""
     json_path = clip.with_suffix(".json")
     if json_path.exists():
-        print(f"  [skip] {clip.name}  (Transkript existiert)")
+        print(f"  [skip] {clip.name}  (transcript exists)")
         return json_path
     print(f"  [whisper] {clip.name} ...", flush=True)
     subprocess.run(
@@ -108,69 +108,69 @@ def load_segments(json_path: pathlib.Path):
         return json.load(f)
 
 
-# --- Sequenz-Format vorschlagen ----------------------------------------------
+# --- Suggest sequence format -------------------------------------------------
 def suggest_sequence(infos: dict):
-    """Schlägt aus den gemessenen Clips ein Ziel-Sequenzformat vor + Warnungen."""
+    """Suggests a target sequence format from the measured clips + warnings."""
     res = Counter((i["width"], i["height"]) for i in infos.values())
     fps = Counter(round(i["rate"], 3) for i in infos.values())
     orient = Counter("portrait" if i["height"] > i["width"] else "landscape"
                      for i in infos.values())
 
     (sw, sh), _ = res.most_common(1)[0]
-    # fps: bei Mischung die niedrigste als sicheren Liefer-Default vorschlagen
+    # fps: on a mix, suggest the lowest as a safe delivery default
     seq_fps = int(round(min(fps)))
     warnings = []
     if len(res) > 1:
-        warnings.append(f"GEMISCHTE Auflösungen: {dict(res)} → Vorschlag = häufigste ({sw}×{sh})")
+        warnings.append(f"MIXED resolutions: {dict(res)} → suggestion = most common ({sw}×{sh})")
     if len(fps) > 1:
-        warnings.append(f"GEMISCHTE fps: {dict(fps)} → Vorschlag = niedrigste ({seq_fps}); "
-                        f"60→30 ist sauber, krumme (29.97/23.976) ggf. NTSC nötig")
+        warnings.append(f"MIXED fps: {dict(fps)} → suggestion = lowest ({seq_fps}); "
+                        f"60→30 is clean, odd rates (29.97/23.976) may need NTSC")
     if len(orient) > 1:
-        warnings.append(f"GEMISCHTE Ausrichtung: {dict(orient)} → 16:9 ODER 9:16? "
-                        f"muss der Nutzer entscheiden")
+        warnings.append(f"MIXED orientation: {dict(orient)} → 16:9 OR 9:16? "
+                        f"the user must decide")
     return sw, sh, seq_fps, warnings
 
 
-# --- transcripts.md schreiben ------------------------------------------------
+# --- Write transcripts.md ----------------------------------------------------
 def write_transcripts(clips, infos, briefing, seq, warnings):
     sw, sh, seq_fps = seq
     with open(OUT_TRANSCRIPTS, "w", encoding="utf-8") as f:
-        f.write("# ClaudeCut — Transkripte & Footage-Übersicht\n\n")
-        f.write(f"**Briefing:** {briefing or '(noch keins — beim Lauf mit --briefing setzen)'}\n\n")
-        f.write(f"**Sequenz-Vorschlag:** {sw}×{sh}, {seq_fps} fps, "
+        f.write("# ClaudeCut — transcripts & footage overview\n\n")
+        f.write(f"**Briefing:** {briefing or '(none yet — set it with --briefing on the run)'}\n\n")
+        f.write(f"**Sequence suggestion:** {sw}×{sh}, {seq_fps} fps, "
                 f"{aspect_label(sw, sh)}\n\n")
         if warnings:
-            f.write("> ⚠️ **Vor dem Bauen klären:**\n")
+            f.write("> ⚠️ **Clarify before building:**\n")
             for w in warnings:
                 f.write(f"> - {w}\n")
             f.write("\n")
-        f.write("## Clip-Übersicht\n\n")
-        f.write("| # | Datei | Auflösung | fps | Seiten | Dauer | Audio |\n")
+        f.write("## Clip overview\n\n")
+        f.write("| # | File | Resolution | fps | Aspect | Duration | Audio |\n")
         f.write("|---|---|---|---|---|---|---|\n")
         for i, clip in enumerate(clips, 1):
             info = infos[clip.name]
             f.write(f"| {i} | `{clip.name}` | {info['width']}×{info['height']} | "
                     f"{fps_label(info['rate'])} | {aspect_label(info['width'], info['height'])} | "
                     f"{info['dur']:.1f}s | {info['channels']}ch |\n")
-        f.write("\n---\n\n## Transkripte (Timecodes clip-relativ, in Sekunden)\n\n")
+        f.write("\n---\n\n## Transcripts (timecodes clip-relative, in seconds)\n\n")
         for clip in clips:
             segs = load_segments(clip.with_suffix(".json"))
             f.write(f"### `{clip.name}`\n\n")
             if not segs:
-                f.write("_(kein Transkript — stumm oder Whisper fehlgeschlagen)_\n\n")
+                f.write("_(no transcript — silent or Whisper failed)_\n\n")
                 continue
             for s in segs:
                 f.write(f"- `[{s['start']:.2f}–{s['end']:.2f}]` ({s.get('lang','?')}) "
                         f"{s['text']}\n")
             f.write("\n")
-    print(f"\nGeschrieben: {OUT_TRANSCRIPTS}")
+    print(f"\nWritten: {OUT_TRANSCRIPTS}")
 
 
-# --- cut.py Scaffold schreiben (nur wenn nicht vorhanden) --------------------
+# --- Write cut.py scaffold (only if not present) -----------------------------
 def write_cut_scaffold(clips_dir, clips, infos, briefing, seq):
     if OUT_CUT.exists():
-        print(f"Hinweis: {OUT_CUT.name} existiert schon → NICHT überschrieben "
-              f"(deine EDL bleibt). Bei Bedarf von Hand anpassen oder löschen.")
+        print(f"Note: {OUT_CUT.name} already exists → NOT overwritten "
+              f"(your EDL stays). Adjust by hand or delete if needed.")
         return
     sw, sh, seq_fps = seq
     catalog = "\n".join(
@@ -178,59 +178,59 @@ def write_cut_scaffold(clips_dir, clips, infos, briefing, seq):
         f'{fps_label(infos[c.name]["rate"])} fps, {infos[c.name]["dur"]:.1f}s)'
         for c in clips)
     content = f'''"""
-cut.py — der Schnitt-Auftrag (von prep.py erzeugt, EDL von Claude gefüllt).
+cut.py — the cut job (generated by prep.py, EDL filled by Claude).
 
-Sekunden als Einheit (clip-relativ, wie in transcripts.md). build_xml.py liest
-diese Datei und baut daraus schnitt.xml. Sequenzformat ggf. an Footage anpassen.
+Seconds as the unit (clip-relative, like in transcripts.md). build_xml.py reads
+this file and builds cut.xml from it. Adjust the sequence format to the footage.
 """
 
 from pathlib import Path
 
-# Footage-Ordner (absolute Pfade; build_xml.py referenziert die Clips von hier)
+# Footage folder (absolute paths; build_xml.py references the clips from here)
 CLIPS_DIR = Path(r"{clips_dir}")
 
 BRIEFING = {briefing!r}
 
-# Ziel-Sequenzformat — Vorschlag aus prep.py, vor dem Bauen prüfen.
+# Target sequence format — suggestion from prep.py, check before building.
 SEQ_FPS = {seq_fps}
 SEQ_W, SEQ_H = {sw}, {sh}
 
-# Verfügbare Clips (Katalog — Namen in die EDL kopieren):
+# Available clips (catalog — copy the names into the EDL):
 {catalog}
 
-# (Dateiname, In-Sekunde, Out-Sekunde, Begründung) — von Claude gefüllt.
+# (filename, in-second, out-second, reason) — filled by Claude.
 EDL = [
 ]
 
-# Bewusst NICHT verwendet (für den Schnittplan dokumentiert):
+# Deliberately NOT used (documented for the cut plan):
 DROPPED = [
 ]
 '''
     OUT_CUT.write_text(content, encoding="utf-8")
-    print(f"Geschrieben: {OUT_CUT}  (EDL noch leer — jetzt füllen)")
+    print(f"Written: {OUT_CUT}  (EDL still empty — fill it now)")
 
 
 def main():
-    ap = argparse.ArgumentParser(description="ClaudeCut-Vorbereitung: Clips → Transkripte + cut.py")
-    ap.add_argument("folder", help="Ordner mit den Clips")
-    ap.add_argument("--briefing", default="", help="Ein Satz: was soll es werden?")
-    ap.add_argument("--langs", nargs="+", default=["de", "en"], help="Whisper-Sprachen")
+    ap = argparse.ArgumentParser(description="ClaudeCut prep: clips → transcripts + cut.py")
+    ap.add_argument("folder", help="Folder with the clips")
+    ap.add_argument("--briefing", default="", help="One sentence: what should it become?")
+    ap.add_argument("--langs", nargs="+", default=["de", "en"], help="Whisper languages")
     args = ap.parse_args()
 
     folder = pathlib.Path(args.folder)
     if not folder.is_dir():
-        sys.exit(f"Ordner nicht gefunden: {folder}")
+        sys.exit(f"Folder not found: {folder}")
     if not WHISPER_PY.exists():
-        sys.exit(f"Whisper-Python nicht gefunden: {WHISPER_PY}")
+        sys.exit(f"Whisper Python not found: {WHISPER_PY}")
 
     clips = sorted(p for p in folder.iterdir()
                    if p.is_file() and p.suffix.lower() in VIDEO_EXTS)
     if not clips:
-        sys.exit(f"Keine Videodateien in {folder} "
-                 f"(gesucht: {', '.join(sorted(VIDEO_EXTS))})")
+        sys.exit(f"No video files in {folder} "
+                 f"(looked for: {', '.join(sorted(VIDEO_EXTS))})")
 
-    print(f"{len(clips)} Clip(s) in {folder}\n")
-    print("1) Metadaten messen (ffprobe) ...")
+    print(f"{len(clips)} clip(s) in {folder}\n")
+    print("1) Measuring metadata (ffprobe) ...")
     infos = {c.name: media_info(c) for c in clips}
     for c in clips:
         i = infos[c.name]
@@ -238,24 +238,24 @@ def main():
               f"{fps_label(i['rate'])}fps {aspect_label(i['width'], i['height'])} "
               f"{i['dur']:.1f}s {i['channels']}ch")
 
-    print("\n2) Transkribieren (Whisper, schon vorhandene werden übersprungen) ...")
+    print("\n2) Transcribing (Whisper, already existing ones are skipped) ...")
     for c in clips:
         transcribe(c, args.langs)
 
-    print("\n3) Sequenzformat vorschlagen ...")
+    print("\n3) Suggesting sequence format ...")
     sw, sh, seq_fps, warnings = suggest_sequence(infos)
-    print(f"  Vorschlag: {sw}×{sh}, {seq_fps} fps, {aspect_label(sw, sh)}")
+    print(f"  Suggestion: {sw}×{sh}, {seq_fps} fps, {aspect_label(sw, sh)}")
     for w in warnings:
         print(f"  ⚠️  {w}")
 
-    print("\n4) Ausgaben schreiben ...")
+    print("\n4) Writing outputs ...")
     write_transcripts(clips, infos, args.briefing, (sw, sh, seq_fps), warnings)
     write_cut_scaffold(folder.resolve(), clips, infos, args.briefing, (sw, sh, seq_fps))
 
-    print("\nFertig. Nächste Schritte:")
-    print(f"  • transcripts.md lesen → Soundbites wählen")
-    print(f"  • EDL in cut.py füllen")
-    print(f"  • python build_xml.py   → schnitt.xml für Premiere")
+    print("\nDone. Next steps:")
+    print(f"  • read transcripts.md → pick soundbites")
+    print(f"  • fill the EDL in cut.py")
+    print(f"  • python build_xml.py   → cut.xml for Premiere")
 
 
 if __name__ == "__main__":
