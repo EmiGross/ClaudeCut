@@ -1,0 +1,19 @@
+# venvs (maschinenspezifisch, schwer)
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Pro-Projekt erzeugt — gehört NICHT ins Repo (jeder Schnitt ist anders):
+cut.py
+transcripts.md
+schnitt.xml
+schnittplan.md
+
+# Test-/Footage-Artefakte
+test_footage/
+*.json
+*.srt
+*.segments.txt

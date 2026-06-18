@@ -1,0 +1,4 @@
+# ClaudeCut — venv für den XML-Teil (otio). NICHT faster-whisper hier rein:
+# Whisper läuft in einem eigenen, GPU-fähigen venv (siehe docs/SETUP.md).
+opentimelineio==0.18.1
+otio-fcp-adapter
