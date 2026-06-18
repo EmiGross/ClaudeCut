@@ -247,7 +247,7 @@ print(f"XML gepatcht: {patched} Datei-Specs + {nch} Audiospuren ({len(v_items)} 
 
 # --- Schnittplan.md schreiben (menschenlesbar) -------------------------------
 with open(OUT_PLAN, "w", encoding="utf-8") as f:
-    f.write("# Schnittplan — ClaudeCut China-Vlog\n\n")
+    f.write("# Schnittplan — ClaudeCut\n\n")
     f.write(f"**Briefing:** {BRIEFING}\n\n")
     f.write(f"**Gesamtlänge:** {total_sec:.1f}s · {len(rows)} Clips\n\n")
     f.write("## Verwendet (in Reihenfolge)\n\n")

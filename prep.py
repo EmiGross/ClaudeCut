@@ -15,7 +15,7 @@ die inhaltliche Auswahl treffen kann:
 Danach:  EDL in cut.py füllen  →  `python build_xml.py`  →  schnitt.xml für Premiere.
 
 Aufruf:
-    python prep.py "D:\\Video\\ChinaTrip\\Footage"
+    python prep.py "D:\\Video\\Beispiel\\Footage"
     python prep.py "D:\\...\\Footage" --briefing "90-Sek-Recap, locker, beste Aussagen" --langs de en
 
 Hinweis: prep.py läuft im ClaudeCut-venv und ruft Whisper über dessen eigenes
@@ -127,7 +127,7 @@ def suggest_sequence(infos: dict):
                         f"60→30 ist sauber, krumme (29.97/23.976) ggf. NTSC nötig")
     if len(orient) > 1:
         warnings.append(f"GEMISCHTE Ausrichtung: {dict(orient)} → 16:9 ODER 9:16? "
-                        f"muss Emiliano entscheiden")
+                        f"muss der Nutzer entscheiden")
     return sw, sh, seq_fps, warnings
 
 
