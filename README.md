@@ -11,11 +11,9 @@ the *message* matters, not the picture.
 
 ## Demo
 
-<video src="https://github.com/EmiGross/ClaudeCut/raw/main/assets/claudecut-demo.mp4" poster="https://github.com/EmiGross/ClaudeCut/raw/main/assets/claudecut-poster.png" controls muted loop width="900">
-  <a href="https://github.com/EmiGross/ClaudeCut/raw/main/assets/claudecut-demo.mp4">
-    <img src="https://github.com/EmiGross/ClaudeCut/raw/main/assets/claudecut-poster.png" alt="ClaudeCut pipeline: clips → Whisper transcripts → Claude picks → Premiere timeline" width="900">
-  </a>
-</video>
+![ClaudeCut pipeline: clips → Whisper transcripts → Claude picks → Premiere timeline](assets/claudecut-demo.gif)
+
+▶️ [Watch in full quality (MP4)](assets/claudecut-demo.mp4)
 
 > ## ⚠️ Important: the "brain" is Claude Code
 > The actual editorial choice (which soundbites make it in, in what order, what
