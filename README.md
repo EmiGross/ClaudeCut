@@ -9,6 +9,14 @@ into the fine cut.
 Built for **content-driven videos** — vlogs, explainers, podcasts: anything where
 the *message* matters, not the picture.
 
+## Demo
+
+<video src="https://github.com/EmiGross/ClaudeCut/raw/main/assets/claudecut-demo.mp4" poster="https://github.com/EmiGross/ClaudeCut/raw/main/assets/claudecut-poster.png" controls muted loop width="900">
+  <a href="https://github.com/EmiGross/ClaudeCut/raw/main/assets/claudecut-demo.mp4">
+    <img src="https://github.com/EmiGross/ClaudeCut/raw/main/assets/claudecut-poster.png" alt="ClaudeCut pipeline: clips → Whisper transcripts → Claude picks → Premiere timeline" width="900">
+  </a>
+</video>
+
 > ## ⚠️ Important: the "brain" is Claude Code
 > The actual editorial choice (which soundbites make it in, in what order, what
 > gets dropped) is made by **Claude in [Claude Code](https://claude.ai/code)**,
