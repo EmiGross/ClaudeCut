@@ -63,14 +63,25 @@ def media_info(path: pathlib.Path) -> dict:
     rate = float(Fraction(int(num), int(den)))
     w = int(ffprobe(path, "v:0", "stream=width")[0])
     h = int(ffprobe(path, "v:0", "stream=height")[0])
-    dur_sec = float(subprocess.check_output([
-        "ffprobe", "-v", "error", "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1", str(path)]).decode().strip())
+    # Use the VIDEO stream's own length, not format=duration (which follows the
+    # longest stream — often audio). When audio runs longer than video it
+    # overstates the frame count and Premiere blacks the clip. Prefer the exact
+    # nb_frames when ffprobe knows it.
+    vdur = ffprobe(path, "v:0", "stream=duration")
+    if vdur and vdur[0] not in ("", "N/A"):
+        dur_sec = float(vdur[0])
+    else:
+        dur_sec = float(subprocess.check_output([
+            "ffprobe", "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", str(path)]).decode().strip())
+    nbf = ffprobe(path, "v:0", "stream=nb_frames")
+    nb = int(nbf[0]) if nbf and nbf[0] not in ("", "N/A") else None
+    total_frames = nb if (nb and nb > 0) else round(dur_sec * rate)
     channels = int(ffprobe(path, "a:0", "stream=channels")[0])
     samplerate = int(ffprobe(path, "a:0", "stream=sample_rate")[0])
     return {
         "rate": rate, "width": w, "height": h,
-        "total_frames": round(dur_sec * rate),
+        "total_frames": total_frames,
         "channels": channels, "samplerate": samplerate,
     }
 
@@ -109,12 +120,23 @@ for filename, in_sec, out_sec, reason in EDL:
     in_frame = round(in_sec * info["rate"])
     dur_frames = round((out_sec - in_sec) * info["rate"])
 
+    # Never reference past the last real video frame — audio can run longer than
+    # the picture, so a selected out can land in the audio-only tail -> Premiere
+    # shows black. Clamp to the measured media.
+    if in_frame >= info["total_frames"]:
+        sys.exit(f"EDL in-point {in_sec:.2f}s is past the video end of {filename}")
+    if in_frame + dur_frames > info["total_frames"]:
+        dur_frames = info["total_frames"] - in_frame
+
     # Timeline position in the target frame rate (independent of the source fps)
     dur_sec = dur_frames / info["rate"]
     s = round(tl_sec * SEQ_FPS)
     tl_sec += dur_sec
     e = round(tl_sec * SEQ_FPS)
-    seq_pos.append((s, e))
+    # Premiere reads a clipitem's <in>/<out> in the SEQUENCE timebase, not the
+    # source clip rate -> express the source in-point in sequence frames.
+    in_seq = round(in_sec * SEQ_FPS)
+    seq_pos.append((s, e, in_seq))
 
     v_track.append(make_clip(path, info, in_frame, dur_frames))
 
@@ -172,9 +194,24 @@ ET.SubElement(sc, "pixelaspectratio").text = "square"
 ET.SubElement(sc, "fielddominance").text = "none"
 
 for i, vci in enumerate(vmedia.findall("track/clipitem")):
-    s, e = seq_pos[i]
+    # otio emits two identical <rate> blocks per clipitem; keep one.
+    for extra in vci.findall("rate")[1:]:
+        vci.remove(extra)
+    s, e, in_seq = seq_pos[i]
+    dur = e - s
+    # Premiere reads clipitem <in>/<out> in the SEQUENCE timebase, not the source
+    # clip rate -> express the clipitem rate AND source in/out in sequence frames
+    # (source dur == timeline dur, no retime). The real media length stays correct
+    # via the <file> rate. Without this, mixed fps (e.g. 59.94 source in a 30 fps
+    # timeline) reads ~2x off -> short clips run past their end -> black.
+    rate_el = vci.find("rate")
+    rate_el.find("timebase").text = str(SEQ_FPS)
+    rate_el.find("ntsc").text = "FALSE"
     vci.find("start").text = str(s)   # timeline position now in target-fps frames
     vci.find("end").text = str(e)
+    vci.find("in").text = str(in_seq)
+    vci.find("out").text = str(in_seq + dur)
+    vci.find("duration").text = str(dur)
 
 # (a) Enter file specs
 patched = 0
@@ -241,6 +278,13 @@ for idx, vci in enumerate(v_items, 1):
         sub(st, "mediatype", "audio")
         sub(st, "trackindex", ch + 1)
         add_links(aci)
+
+# (c) Fix the media path dialect: Premiere on Windows relinks reliably only from
+# the file://localhost/ form. otio writes file:///C:/... which Premiere's FCP7
+# importer often fails to locate (media comes in offline).
+for pathurl in root.iter("pathurl"):
+    if pathurl.text and pathurl.text.startswith("file:///"):
+        pathurl.text = "file://localhost/" + pathurl.text[len("file:///"):]
 
 tree.write(OUT_XML, encoding="utf-8", xml_declaration=True)
 print(f"XML patched: {patched} file specs + {nch} audio tracks ({len(v_items)} clips, linked).")
