@@ -215,6 +215,7 @@ for i, vci in enumerate(vmedia.findall("track/clipitem")):
 
 # (a) Enter file specs
 patched = 0
+file_channels = {}  # <file> id -> audio channels of that clip
 for file_el in root.iter("file"):
     name_el = file_el.find("name")
     if name_el is None:
@@ -222,6 +223,7 @@ for file_el in root.iter("file"):
     decoded = urllib.parse.unquote(name_el.text)  # otio encodes spaces as %20
     if decoded in infos:  # only fully defined <file>
         patch_file_media(file_el, infos[decoded])
+        file_channels[file_el.get("id")] = infos[decoded]["channels"]
         patched += 1
 
 
@@ -239,6 +241,7 @@ def link_block(parent, ref, mediatype, trackindex, clipindex):
     sub(lk, "mediatype", mediatype)
     sub(lk, "trackindex", trackindex)
     sub(lk, "clipindex", clipindex)
+    return lk
 
 
 nch = max(info["channels"] for info in infos.values())  # stereo -> 2 audio tracks
@@ -246,7 +249,33 @@ seq_media = root.find(".//sequence/media")
 audio_sec = seq_media.find("audio")
 for t in audio_sec.findall("track"):          # remove otio's empty stubs
     audio_sec.remove(t)
+
+# Premiere writes ONE stereo track as a pair of <track>s carrying its own markers
+# and joins the pair again on import. Without them the sound arrives as two mono
+# tracks (left and right separate, not panned). Pattern from a real Premiere export.
+stereo = nch == 2
+if stereo:
+    sub(audio_sec, "numOutputChannels", 2)
+    asc = sub(sub(audio_sec, "format"), "samplecharacteristics")
+    sub(asc, "depth", 16)
+    sub(asc, "samplerate", 48000)
+    outputs = sub(audio_sec, "outputs")
+    for ch in (1, 2):
+        group = sub(outputs, "group")
+        sub(group, "index", ch)
+        sub(group, "numchannels", 1)
+        sub(group, "downmix", 0)
+        sub(sub(group, "channel"), "index", ch)
+
 a_tracks = [ET.SubElement(audio_sec, "track") for _ in range(nch)]
+if stereo:
+    for ch, t in enumerate(a_tracks):
+        t.attrib.update({
+            "PannerCurrentValue": "0.5", "PannerIsInverted": "true",
+            "PannerStartKeyframe": "-91445760000000000,0.5,0,0,0,0,0,0",
+            "PannerName": "Balance", "currentExplodedTrackIndex": str(ch),
+            "totalExplodedTrackCount": "2", "premiereTrackType": "Stereo",
+        })
 
 v_items = seq_media.findall("video/track/clipitem")
 for idx, vci in enumerate(v_items, 1):
@@ -259,13 +288,17 @@ for idx, vci in enumerate(v_items, 1):
 
     def add_links(target):
         for ref, mt, ti in members:
-            link_block(target, ref, mt, ti, idx)
+            lk = link_block(target, ref, mt, ti, idx)
+            if stereo and mt == "audio":
+                sub(lk, "groupindex", 1)
 
     add_links(vci)  # links on the video clip too
 
     for ch in range(nch):
         aci = ET.SubElement(a_tracks[ch], "clipitem")
         aci.set("id", audio_ids[ch])
+        if stereo and file_channels.get(file_id) == 2:
+            aci.set("premiereChannelType", "stereo")
         sub(aci, "name", vci.find("name").text)
         aci.append(copy.deepcopy(vci.find("rate")))
         sub(aci, "duration", vci.find("duration").text)
@@ -279,6 +312,12 @@ for idx, vci in enumerate(v_items, 1):
         sub(st, "trackindex", ch + 1)
         add_links(aci)
 
+if stereo:
+    for ch, t in enumerate(a_tracks):
+        sub(t, "enabled", "TRUE")
+        sub(t, "locked", "FALSE")
+        sub(t, "outputchannelindex", ch + 1)
+
 # (c) Fix the media path dialect: Premiere on Windows relinks reliably only from
 # the file://localhost/ form. otio writes file:///C:/... which Premiere's FCP7
 # importer often fails to locate (media comes in offline).
@@ -287,7 +326,8 @@ for pathurl in root.iter("pathurl"):
         pathurl.text = "file://localhost/" + pathurl.text[len("file:///"):]
 
 tree.write(OUT_XML, encoding="utf-8", xml_declaration=True)
-print(f"XML patched: {patched} file specs + {nch} audio tracks ({len(v_items)} clips, linked).")
+print(f"XML patched: {patched} file specs + "
+      f"{'1 stereo track' if stereo else f'{nch} audio tracks'} ({len(v_items)} clips, linked).")
 
 # --- Write cut_plan.md (human-readable) --------------------------------------
 with open(OUT_PLAN, "w", encoding="utf-8") as f:
